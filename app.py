@@ -299,7 +299,13 @@ def calculate_route(start_lat, start_lon, sights, max_distance_km, route_type="r
         min_sights = 4
 
     min_sights = min(min_sights, len(nearby_sights))
-    max_sights = min(5, len(nearby_sights))
+    # Allow more sights for longer distances to reach target km
+    if max_distance_km >= 12:
+        max_sights = min(8, len(nearby_sights))
+    elif max_distance_km >= 8:
+        max_sights = min(6, len(nearby_sights))
+    else:
+        max_sights = min(5, len(nearby_sights))
 
     if not nearby_sights:
         print("⚠️ No sights within range")

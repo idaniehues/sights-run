@@ -587,7 +587,12 @@
                 })
             });
 
-            if (!response.ok) throw new Error('Failed');
+            const data = await response.json();
+            if (!response.ok) {
+                console.error('Error:', data);
+                alert('Error: ' + (data.error || 'Something went wrong.'));
+                return;
+            }
             document.getElementById('creatorName').value = '';
             document.getElementById('runTitle').value = '';
             document.getElementById('runDescription').value = '';
@@ -596,6 +601,7 @@
             alert('✅ Open Run created! Other runners can now join.');
             await renderOpenRuns();
         } catch (e) {
+            console.error(e);
             alert('Something went wrong. Please try again.');
         }
     }
