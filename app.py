@@ -10,7 +10,7 @@ from metro import get_all_metro_stations, get_random_metro_station
 from sights import get_sights_near_route, calculate_distance
 
 app = Flask(__name__)
-ORS_API_KEY = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjJkOTlhYjllMjUzYzRjMjVhOWJiZDNhZTUxZjMzYjE5IiwiaCI6Im11cm11cjY0In0="
+ORS_API_KEY = os.getenv("ORS_API_KEY", "")
 
 # Bounding box for central Lisbon
 LISBON_CENTER_BOUNDS = {
