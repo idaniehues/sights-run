@@ -505,19 +505,31 @@
         <h3>Create Open Run</h3>
         <div class="modal-field">
             <label>Your Name</label>
-            <input type="text" placeholder="e.g. João">
+            <input type="text" id="creatorName" placeholder="e.g. João">
+        </div>
+        <div class="modal-field">
+            <label>Run Title</label>
+            <input type="text" id="runTitle" placeholder="e.g. Saturday Sights Loop">
         </div>
         <div class="modal-field">
             <label>Date</label>
-            <input type="date">
+            <input type="date" id="runDate">
         </div>
         <div class="modal-field">
             <label>Time</label>
-            <input type="time" value="08:00">
+            <input type="time" id="runTime" value="08:00">
         </div>
         <div class="modal-field">
-            <label>Max. Participants</label>
-            <input type="number" value="5" min="2" max="20">
+            <label>Meeting Point</label>
+            <input type="text" id="meetingPoint" placeholder="{{ start_name }}">
+        </div>
+        <div class="modal-field">
+            <label>Description (optional)</label>
+            <textarea id="runDescription" rows="2" placeholder="Pace, coffee after, anything useful..."></textarea>
+        </div>
+        <div class="modal-field">
+            <label>Max. Participants (optional)</label>
+            <input type="number" id="maxParticipants" min="1" max="100" placeholder="No limit">
         </div>
         <div class="modal-buttons">
             <button class="btn-confirm" onclick="createOpenRun()">Create</button>

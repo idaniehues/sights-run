@@ -319,13 +319,17 @@ def calculate_route(start_lat, start_lon, sights, max_distance_km, route_type="r
     clockwise = sort_sights_for_loop(start_lat, start_lon, nearby_sights.copy())
     counterclockwise = list(reversed(clockwise))
 
-    def request_route(waypoints):
+    def request_route(waypoints, target_km=None):
         coords = [[start_lon, start_lat]]
         for sight in waypoints:
             coords.append([sight["lon"], sight["lat"]])
         if route_type == "roundtrip":
             coords.append([start_lon, start_lat])
         body = {"coordinates": coords}
+        # For 12km routes, tell ORS to avoid shortcuts and prefer longer paths
+        if target_km and target_km >= 12:
+            body["options"] = {"avoid_features": ["ferries"]}
+            body["preference"] = "recommended"
         response = requests.post(url_base, json=body, headers=headers)
         return response.json()
 
@@ -345,7 +349,7 @@ def calculate_route(start_lat, start_lon, sights, max_distance_km, route_type="r
         for n in range(min_sights, max_sights + 1):
             waypoints = ordering[:n]
             try:
-                data = request_route(waypoints)
+                data = request_route(waypoints, target_km=max_distance_km)
                 actual_distance = data["features"][0]["properties"]["summary"]["distance"]
                 raw_coords = data["features"][0]["geometry"]["coordinates"]
                 route_coords_latlon = [[c[1], c[0]] for c in raw_coords]
