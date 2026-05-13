@@ -240,111 +240,6 @@
             margin-bottom: 1.5rem;
         }
 
-        .open-runs-list {
-            display: flex;
-            flex-direction: column;
-            gap: 1rem;
-            margin-top: 1.5rem;
-        }
-
-        .open-run-empty {
-            color: #666;
-            font-size: 0.85rem;
-            line-height: 1.5;
-        }
-
-        .open-run-card {
-            background: #171717;
-            border: 1px solid #292929;
-            border-radius: 8px;
-            padding: 1rem;
-        }
-
-        .open-run-card h4 {
-            color: var(--light);
-            font-size: 1rem;
-            font-weight: 500;
-            margin-bottom: 0.45rem;
-        }
-
-        .open-run-meta,
-        .open-run-summary,
-        .participant-names {
-            color: #999;
-            font-size: 0.82rem;
-            line-height: 1.5;
-            margin-top: 0.35rem;
-        }
-
-        .open-run-summary {
-            color: #777;
-        }
-
-        .participant-count {
-            color: var(--pink);
-            font-size: 0.82rem;
-            margin-top: 0.7rem;
-        }
-
-        .join-row {
-            display: grid;
-            grid-template-columns: minmax(0, 1fr) auto;
-            gap: 0.5rem;
-            margin-top: 0.8rem;
-        }
-
-        .join-row input {
-            min-width: 0;
-            background: var(--grey);
-            border: 1px solid #333;
-            color: var(--light);
-            padding: 0.65rem 0.75rem;
-            border-radius: 8px;
-            font-family: 'DM Sans', sans-serif;
-            font-size: 0.85rem;
-        }
-
-        .join-row button,
-        .calendar-actions button,
-        .calendar-actions a {
-            border: 1px solid var(--pink);
-            background: transparent;
-            color: var(--pink);
-            border-radius: 8px;
-            padding: 0.65rem 0.75rem;
-            cursor: pointer;
-            font-family: 'DM Sans', sans-serif;
-            font-size: 0.82rem;
-            text-decoration: none;
-            text-align: center;
-            transition: all 0.2s;
-        }
-
-        .join-row button:hover,
-        .calendar-actions button:hover,
-        .calendar-actions a:hover {
-            background: var(--pink);
-            color: white;
-        }
-
-        .join-row button:disabled {
-            cursor: not-allowed;
-            opacity: 0.45;
-        }
-
-        .join-message {
-            color: #777;
-            font-size: 0.78rem;
-            margin-top: 0.45rem;
-        }
-
-        .calendar-actions {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 0.5rem;
-            margin-top: 0.8rem;
-        }
-
         .btn-open-run {
             background: transparent;
             color: var(--pink);
@@ -424,8 +319,6 @@
             padding: 2.5rem;
             width: 450px;
             max-width: 90vw;
-            max-height: 90vh;
-            overflow-y: auto;
         }
 
         .modal-box h3 {
@@ -450,8 +343,7 @@
             color: #666;
         }
 
-        .modal-field input,
-        .modal-field textarea {
+        .modal-field input {
             background: var(--grey);
             border: 1px solid #333;
             color: var(--light);
@@ -459,11 +351,9 @@
             border-radius: 8px;
             font-family: 'DM Sans', sans-serif;
             font-size: 0.95rem;
-            resize: vertical;
         }
 
-        .modal-field input:focus,
-        .modal-field textarea:focus {
+        .modal-field input:focus {
             outline: none;
             border-color: var(--pink);
         }
@@ -601,7 +491,6 @@
             <button class="btn-open-run" onclick="openModal()">
                 🏃 Create Open Run
             </button>
-            <div class="open-runs-list" id="openRunsList"></div>
         </div>
     </div>
 
@@ -616,31 +505,19 @@
         <h3>Create Open Run</h3>
         <div class="modal-field">
             <label>Your Name</label>
-            <input type="text" id="creatorName" placeholder="e.g. Maria">
-        </div>
-        <div class="modal-field">
-            <label>Run Title</label>
-            <input type="text" id="runTitle" placeholder="e.g. Saturday Sights Loop">
+            <input type="text" placeholder="e.g. João">
         </div>
         <div class="modal-field">
             <label>Date</label>
-            <input type="date" id="runDate">
+            <input type="date">
         </div>
         <div class="modal-field">
             <label>Time</label>
-            <input type="time" id="runTime" value="08:00">
+            <input type="time" value="08:00">
         </div>
         <div class="modal-field">
-            <label>Meeting Point</label>
-            <input type="text" id="meetingPoint" placeholder="{{ start_name }}">
-        </div>
-        <div class="modal-field">
-            <label>Description Optional</label>
-            <textarea id="runDescription" rows="3" placeholder="Pace, coffee plan, anything runners should know."></textarea>
-        </div>
-        <div class="modal-field">
-            <label>Max. Participants Optional</label>
-            <input type="number" id="maxParticipants" min="1" max="100" placeholder="No limit">
+            <label>Max. Participants</label>
+            <input type="number" value="5" min="2" max="20">
         </div>
         <div class="modal-buttons">
             <button class="btn-confirm" onclick="createOpenRun()">Create</button>
@@ -650,8 +527,6 @@
 </div>
 
 <script>
-    const OPEN_RUNS_KEY = 'sightsRunOpenRuns';
-    const JOINED_RUNS_KEY = 'sightsRunJoinedOpenRuns';
     const CURRENT_ROUTE = {
         startName: {{ start_name|tojson }},
         distance: {{ actual_distance|tojson }},
@@ -660,20 +535,6 @@
         googleMapsUrl: {{ gmaps_url|tojson }}
     };
 
-    // Debug: log the Google Maps URL to verify it matches the website route
-    function logGmapsUrl() {
-        const url = CURRENT_ROUTE.googleMapsUrl;
-        console.log("=== OPENING GOOGLE MAPS ===");
-        console.log("URL:", url);
-        // Parse and display waypoints
-        const waypointsMatch = url.match(/waypoints=([^&]+)/);
-        if (waypointsMatch) {
-            const waypoints = decodeURIComponent(waypointsMatch[1]).split("|");
-            console.log("Waypoints in order:");
-            waypoints.forEach((wp, i) => console.log(`  ${i+1}: ${wp}`));
-        }
-    }
-
     function toggleSight(el) {
         el.classList.toggle('expanded');
     }
@@ -681,9 +542,7 @@
     function openModal() {
         const today = getLocalDateValue(new Date());
         const dateInput = document.getElementById('runDate');
-        if (!dateInput.value) {
-            dateInput.value = today;
-        }
+        if (!dateInput.value) dateInput.value = today;
         dateInput.min = today;
         document.getElementById('meetingPoint').placeholder = CURRENT_ROUTE.startName;
         document.getElementById('openRunModal').classList.add('active');
@@ -693,8 +552,8 @@
         document.getElementById('openRunModal').classList.remove('active');
     }
 
-    function createOpenRun() {
-        const creatorName = document.getElementById('creatorName').value.trim().replace(/\s+/g, ' ');
+    async function createOpenRun() {
+        const creatorName = document.getElementById('creatorName').value.trim();
         const title = document.getElementById('runTitle').value.trim();
         const date = document.getElementById('runDate').value;
         const time = document.getElementById('runTime').value;
@@ -703,8 +562,8 @@
         const maxParticipantsValue = document.getElementById('maxParticipants').value;
         const maxParticipants = maxParticipantsValue ? Number(maxParticipantsValue) : null;
 
-        if (!creatorName || !title || !date || !time || !meetingPoint) {
-            alert('Please add your name, a title, date, time and meeting point.');
+        if (!creatorName || !title || !date || !time) {
+            alert('Please fill in your name, title, date and time.');
             return;
         }
 
@@ -714,155 +573,94 @@
             return;
         }
 
-        const runs = getOpenRuns();
-        runs.push({
-            id: `run-${Date.now()}`,
-            title,
-            date,
-            time,
-            meetingPoint,
-            description,
-            maxParticipants,
-            participants: [creatorName],
-            route: { ...CURRENT_ROUTE },
-            createdAt: new Date().toISOString()
-        });
-
-        saveOpenRuns(runs);
-        saveJoinedRunIds([...getJoinedRunIds(), runs[runs.length - 1].id]);
-        resetOpenRunForm();
-        renderOpenRuns();
-        alert('✅ Open Run created! You are already on the participant list.');
-        closeModal();
-    }
-
-    function resetOpenRunForm() {
-        document.getElementById('creatorName').value = '';
-        document.getElementById('runTitle').value = '';
-        document.getElementById('runDescription').value = '';
-        document.getElementById('maxParticipants').value = '';
-    }
-
-    function getOpenRuns() {
         try {
-            return JSON.parse(localStorage.getItem(OPEN_RUNS_KEY)) || [];
-        } catch {
-            return [];
+            const response = await fetch('/api/open_runs', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    creatorName, title, date, time, meetingPoint,
+                    description, maxParticipants,
+                    routeSummary: CURRENT_ROUTE.routeSummary,
+                    gmapsUrl: CURRENT_ROUTE.googleMapsUrl,
+                    distance: CURRENT_ROUTE.distance,
+                    startName: CURRENT_ROUTE.startName
+                })
+            });
+
+            if (!response.ok) throw new Error('Failed');
+            document.getElementById('creatorName').value = '';
+            document.getElementById('runTitle').value = '';
+            document.getElementById('runDescription').value = '';
+            document.getElementById('maxParticipants').value = '';
+            closeModal();
+            alert('✅ Open Run created! Other runners can now join.');
+            await renderOpenRuns();
+        } catch (e) {
+            alert('Something went wrong. Please try again.');
         }
     }
 
-    function saveOpenRuns(runs) {
-        localStorage.setItem(OPEN_RUNS_KEY, JSON.stringify(runs));
-    }
-
-    function getJoinedRunIds() {
-        try {
-            return JSON.parse(localStorage.getItem(JOINED_RUNS_KEY)) || [];
-        } catch {
-            return [];
-        }
-    }
-
-    function saveJoinedRunIds(ids) {
-        localStorage.setItem(JOINED_RUNS_KEY, JSON.stringify([...new Set(ids)]));
-    }
-
-    function getUpcomingRuns() {
-        const now = new Date();
-        return getOpenRuns()
-            .filter(run => new Date(`${run.date}T${run.time}`) >= now)
-            .sort((a, b) => new Date(`${a.date}T${a.time}`) - new Date(`${b.date}T${b.time}`));
-    }
-
-    function renderOpenRuns() {
-        const container = document.getElementById('openRunsList');
-        const runs = getUpcomingRuns();
-        const joinedIds = getJoinedRunIds();
-
-        if (!runs.length) {
-            container.innerHTML = '<div class="open-run-empty">No upcoming open runs yet. Create one from this route.</div>';
-            return;
-        }
-
-        container.innerHTML = runs.map(run => {
-            const participants = run.participants || [];
-            const maxText = run.maxParticipants ? ` / ${run.maxParticipants}` : '';
-            const participantNames = participants.length ? participants.join(', ') : 'No runners yet';
-            const isFull = run.maxParticipants && participants.length >= run.maxParticipants;
-            const hasJoined = joinedIds.includes(run.id);
-            const dateTimeText = formatRunDateTime(run.date, run.time);
-
-            return `
-                <div class="open-run-card" data-run-id="${escapeHtml(run.id)}">
-                    <h4>${escapeHtml(run.title)}</h4>
-                    <div class="open-run-meta">${escapeHtml(dateTimeText)}</div>
-                    <div class="open-run-meta">📏 ${escapeHtml(String(run.route.distance))} km</div>
-                    <div class="open-run-meta">📍 ${escapeHtml(run.meetingPoint)}</div>
-                    <div class="open-run-summary">${escapeHtml(run.route.routeSummary)}</div>
-                    <div class="participant-count">${participants.length}${maxText} joined</div>
-                    <div class="participant-names">${escapeHtml(participantNames)}</div>
-                    <div class="join-row">
-                        <input type="text" placeholder="Your name" id="join-${escapeHtml(run.id)}" ${isFull ? 'disabled' : ''}>
-                        <button onclick="joinOpenRun('${escapeJs(run.id)}')" ${isFull ? 'disabled' : ''}>Join</button>
-                    </div>
-                    <div class="join-message" id="message-${escapeHtml(run.id)}">${isFull ? 'This run is full.' : ''}</div>
-                    ${hasJoined ? calendarActionsHtml(run) : ''}
-                </div>
-            `;
-        }).join('');
-    }
-
-    function joinOpenRun(runId) {
+    async function joinOpenRun(runId) {
         const input = document.getElementById(`join-${runId}`);
-        const name = input.value.trim().replace(/\s+/g, ' ');
         const message = document.getElementById(`message-${runId}`);
+        const name = input.value.trim();
+        if (!name) { message.textContent = 'Add your name to join.'; return; }
 
-        if (!name) {
-            message.textContent = 'Add your name to join.';
-            return;
+        try {
+            const response = await fetch(`/api/open_runs/${runId}/join`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name })
+            });
+            const data = await response.json();
+            if (!response.ok) { message.textContent = data.error || 'Could not join.'; return; }
+            await renderOpenRuns();
+        } catch (e) {
+            message.textContent = 'Something went wrong.';
         }
-
-        const runs = getOpenRuns();
-        const run = runs.find(item => item.id === runId);
-        if (!run) {
-            message.textContent = 'This run is no longer available.';
-            return;
-        }
-
-        run.participants = run.participants || [];
-        const alreadyJoined = run.participants.some(participant => participant.toLowerCase() === name.toLowerCase());
-        if (alreadyJoined) {
-            message.textContent = `${name} is already on the list.`;
-            return;
-        }
-
-        if (run.maxParticipants && run.participants.length >= run.maxParticipants) {
-            message.textContent = 'This run is full.';
-            return;
-        }
-
-        run.participants.push(name);
-        saveOpenRuns(runs);
-        saveJoinedRunIds([...getJoinedRunIds(), runId]);
-        renderOpenRuns();
     }
 
-    function calendarActionsHtml(run) {
-        return `
-            <div class="calendar-actions">
-                <button onclick="downloadIcs('${escapeJs(run.id)}')">.ics Calendar</button>
-                <a href="${escapeHtml(buildGoogleCalendarUrl(run))}" target="_blank" rel="noopener noreferrer">Google Calendar</a>
-            </div>
-        `;
-    }
+    async function renderOpenRuns() {
+        const container = document.getElementById('openRunsList');
+        try {
+            const response = await fetch('/api/open_runs');
+            const runs = await response.json();
+            const now = new Date();
+            const upcoming = runs.filter(r => new Date(`${r.date}T${r.time}`) >= now);
 
-    function buildCalendarDescription(run) {
-        const parts = [
-            run.description,
-            run.route.routeSummary,
-            run.route.googleMapsUrl ? `Google Maps route: ${run.route.googleMapsUrl}` : ''
-        ].filter(Boolean);
-        return parts.join('\n\n');
+            if (!upcoming.length) {
+                container.innerHTML = '<div class="open-run-empty">No upcoming open runs yet. Create one!</div>';
+                return;
+            }
+
+            container.innerHTML = upcoming.map(run => {
+                const participants = run.participants || [];
+                const maxText = run.max_participants ? ` / ${run.max_participants}` : '';
+                const isFull = run.max_participants && participants.length >= run.max_participants;
+
+                return `
+                    <div class="open-run-card">
+                        <h4>${escapeHtml(run.title)}</h4>
+                        <div class="open-run-meta">${escapeHtml(formatRunDateTime(run.date, run.time))}</div>
+                        <div class="open-run-meta">📏 ${run.distance} km</div>
+                        <div class="open-run-meta">📍 ${escapeHtml(run.meeting_point)}</div>
+                        <div class="open-run-summary">${escapeHtml(run.route_summary || '')}</div>
+                        <div class="participant-count">${participants.length}${maxText} joined</div>
+                        <div class="participant-names">${escapeHtml(participants.join(', ') || 'No runners yet')}</div>
+                        <div class="join-row">
+                            <input type="text" placeholder="Your name" id="join-${escapeHtml(run.id)}" ${isFull ? 'disabled' : ''}>
+                            <button onclick="joinOpenRun('${escapeJs(run.id)}')" ${isFull ? 'disabled' : ''}>Join</button>
+                        </div>
+                        <div class="join-message" id="message-${escapeHtml(run.id)}">${isFull ? 'This run is full.' : ''}</div>
+                        <div class="calendar-actions">
+                            <a href="${escapeHtml(buildGoogleCalendarUrl(run))}" target="_blank" rel="noopener noreferrer">Google Calendar</a>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        } catch (e) {
+            container.innerHTML = '<div class="open-run-empty">Could not load open runs.</div>';
+        }
     }
 
     function buildGoogleCalendarUrl(run) {
@@ -872,52 +670,18 @@
             action: 'TEMPLATE',
             text: run.title,
             dates: `${toGoogleDate(start)}/${toGoogleDate(end)}`,
-            location: run.meetingPoint,
-            details: buildCalendarDescription(run)
+            location: run.meeting_point,
+            details: [run.description, run.route_summary, run.gmaps_url ? `Route: ${run.gmaps_url}` : ''].filter(Boolean).join('
+
+')
         });
         return `https://calendar.google.com/calendar/render?${params.toString()}`;
     }
 
-    function downloadIcs(runId) {
-        const run = getOpenRuns().find(item => item.id === runId);
-        if (!run) return;
-
-        const start = new Date(`${run.date}T${run.time}`);
-        const end = new Date(start.getTime() + 90 * 60 * 1000);
-        const ics = [
-            'BEGIN:VCALENDAR',
-            'VERSION:2.0',
-            'PRODID:-//Sights Run Lisboa//Open Run//EN',
-            'BEGIN:VEVENT',
-            `UID:${run.id}@sights-run-lisboa`,
-            `DTSTAMP:${toIcsDate(new Date())}`,
-            `DTSTART:${toIcsDate(start)}`,
-            `DTEND:${toIcsDate(end)}`,
-            `SUMMARY:${escapeIcs(run.title)}`,
-            `LOCATION:${escapeIcs(run.meetingPoint)}`,
-            `DESCRIPTION:${escapeIcs(buildCalendarDescription(run))}`,
-            'END:VEVENT',
-            'END:VCALENDAR'
-        ].join('\r\n');
-
-        const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `${slugify(run.title)}.ics`;
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        URL.revokeObjectURL(url);
-    }
-
     function formatRunDateTime(date, time) {
         return new Intl.DateTimeFormat(undefined, {
-            weekday: 'short',
-            month: 'short',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
+            weekday: 'short', month: 'short', day: 'numeric',
+            hour: '2-digit', minute: '2-digit'
         }).format(new Date(`${date}T${time}`));
     }
 
@@ -925,43 +689,18 @@
         return date.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
     }
 
-    function toIcsDate(date) {
-        return toGoogleDate(date);
-    }
-
     function getLocalDateValue(date) {
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
-    }
-
-    function escapeIcs(value) {
-        return String(value || '')
-            .replace(/\\/g, '\\\\')
-            .replace(/\n/g, '\\n')
-            .replace(/,/g, '\\,')
-            .replace(/;/g, '\\;');
-    }
-
-    function slugify(value) {
-        return String(value || 'open-run')
-            .toLowerCase()
-            .replace(/[^a-z0-9]+/g, '-')
-            .replace(/(^-|-$)/g, '') || 'open-run';
+        return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
     }
 
     function escapeHtml(value) {
         return String(value || '')
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#39;');
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     }
 
     function escapeJs(value) {
-        return String(value || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+        return String(value || '').replace(/\/g, '\\').replace(/'/g, "\'");
     }
 
     renderOpenRuns();

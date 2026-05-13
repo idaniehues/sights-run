@@ -5,12 +5,16 @@ import random
 import json
 import os
 import math
+from supabase import create_client
 
 from metro import get_all_metro_stations, get_random_metro_station
 from sights import get_sights_near_route, calculate_distance
 
 app = Flask(__name__)
 ORS_API_KEY = os.getenv("ORS_API_KEY", "")
+SUPABASE_URL = os.getenv("SUPABASE_URL", "")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
+supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # Bounding box for central Lisbon
 LISBON_CENTER_BOUNDS = {
@@ -35,7 +39,6 @@ def home():
 # -------------------------------------------------------
 @app.route("/stations_for_distance/<float:distance_km>")
 def stations_for_distance(distance_km):
-    """Returns metro stations that have sights within range for the given distance"""
     stations = get_all_metro_stations(distance_km=distance_km)
     return jsonify(stations)
 
@@ -87,41 +90,26 @@ def generate():
     else:
         return "Invalid starting point", 400
 
-    # Get nearby sights
     sights = get_sights_near_route(start_lat, start_lon, distance)
-
-    # Calculate route
     route_coords, sights, actual_distance, leg_distances = calculate_route(
         start_lat, start_lon, sights, distance, route_type
     )
 
-    # Show error if no sights were found within range
     if not sights:
         return render_template("error.html", message=(
             "No sights found within range of this starting point. "
             "Try selecting a longer distance or a starting point closer to the city centre."
         ))
 
-    # Attach real leg distances to each sight
     sights = attach_leg_distances(sights, leg_distances, actual_distance, route_type)
-
-    # Build canonical ordered stop list (single source of truth for map + Google Maps)
     canonical_stops = build_canonical_stops(start_lat, start_lon, start_name, sights, route_type)
-
-    # Build Google Maps URL from the same canonical stop list
     gmaps_url = build_google_maps_url(canonical_stops)
-
-    # Build route summary for Open Run feature
     route_summary = build_route_summary(canonical_stops, route_type)
-
-    # Create map using canonical stops
     map_html = create_map(canonical_stops, route_coords, route_type)
 
-    # Debug: log stop list to verify map and Google Maps use same stops
     print("=== CANONICAL STOP LIST ===")
     for i, stop in enumerate(canonical_stops):
         print(f"  {i}: {stop['name']} ({stop['lat']:.5f}, {stop['lon']:.5f})")
-    print(f"=== GOOGLE MAPS URL ===\n  {gmaps_url}")
 
     return render_template(
         "map.html",
@@ -137,6 +125,73 @@ def generate():
 
 
 # -------------------------------------------------------
+# OPEN RUNS API
+# -------------------------------------------------------
+@app.route("/api/open_runs", methods=["GET"])
+def get_open_runs():
+    """Returns all upcoming open runs from Supabase"""
+    try:
+        response = supabase.table("open_runs").select("*").order("date").order("time").execute()
+        return jsonify(response.data)
+    except Exception as e:
+        print(f"Supabase error: {e}")
+        return jsonify([])
+
+
+@app.route("/api/open_runs", methods=["POST"])
+def create_open_run():
+    """Creates a new open run in Supabase"""
+    try:
+        data = request.json
+        response = supabase.table("open_runs").insert({
+            "title": data["title"],
+            "date": data["date"],
+            "time": data["time"],
+            "meeting_point": data["meetingPoint"],
+            "description": data.get("description", ""),
+            "max_participants": data.get("maxParticipants"),
+            "participants": [data["creatorName"]],
+            "route_summary": data["routeSummary"],
+            "gmaps_url": data["gmapsUrl"],
+            "distance": data["distance"],
+            "start_name": data["startName"],
+        }).execute()
+        return jsonify(response.data[0]), 201
+    except Exception as e:
+        print(f"Supabase error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/open_runs/<run_id>/join", methods=["POST"])
+def join_open_run(run_id):
+    """Adds a participant to an open run"""
+    try:
+        name = request.json.get("name", "").strip()
+        if not name:
+            return jsonify({"error": "Name required"}), 400
+
+        # Get current run
+        run = supabase.table("open_runs").select("*").eq("id", run_id).single().execute()
+        participants = run.data.get("participants") or []
+        max_p = run.data.get("max_participants")
+
+        # Check if already joined
+        if any(p.lower() == name.lower() for p in participants):
+            return jsonify({"error": "Already joined"}), 400
+
+        # Check if full
+        if max_p and len(participants) >= max_p:
+            return jsonify({"error": "Run is full"}), 400
+
+        participants.append(name)
+        response = supabase.table("open_runs").update({"participants": participants}).eq("id", run_id).execute()
+        return jsonify(response.data[0])
+    except Exception as e:
+        print(f"Supabase error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+# -------------------------------------------------------
 # RANDOM METRO STATION (AJAX)
 # -------------------------------------------------------
 @app.route("/random_station")
@@ -149,7 +204,6 @@ def random_station():
 # HELPER FUNCTIONS
 # -------------------------------------------------------
 def is_in_central_lisbon(lat, lon):
-    """Checks if coordinates are within the central Lisbon bounding box"""
     return (
         LISBON_CENTER_BOUNDS["min_lat"] <= lat <= LISBON_CENTER_BOUNDS["max_lat"] and
         LISBON_CENTER_BOUNDS["min_lon"] <= lon <= LISBON_CENTER_BOUNDS["max_lon"]
@@ -157,13 +211,8 @@ def is_in_central_lisbon(lat, lon):
 
 
 def geocode_address(address):
-    """Converts an address to coordinates via Nominatim (OpenStreetMap)"""
     url = "https://nominatim.openstreetmap.org/search"
-    params = {
-        "q": f"{address}, Lisboa, Portugal",
-        "format": "json",
-        "limit": 1
-    }
+    params = {"q": f"{address}, Lisboa, Portugal", "format": "json", "limit": 1}
     headers = {"User-Agent": "SightsRunApp/1.0"}
     try:
         response = requests.get(url, params=params, headers=headers)
@@ -176,10 +225,6 @@ def geocode_address(address):
 
 
 def get_bearing(lat1, lon1, lat2, lon2):
-    """
-    Calculates the compass bearing from point 1 to point 2 in degrees (0-360).
-    Used to sort sights clockwise around the start point.
-    """
     d_lon = math.radians(lon2 - lon1)
     lat1_r = math.radians(lat1)
     lat2_r = math.radians(lat2)
@@ -190,29 +235,18 @@ def get_bearing(lat1, lon1, lat2, lon2):
 
 
 def sort_sights_for_loop(start_lat, start_lon, sights):
-    """
-    Sorts sights clockwise by bearing from the start point.
-    Ensures the route flows as a natural loop instead of zigzagging.
-    """
     for sight in sights:
         sight["bearing"] = get_bearing(start_lat, start_lon, sight["lat"], sight["lon"])
     return sorted(sights, key=lambda s: s["bearing"])
 
 
 def score_route(route_coords, actual_distance, target_distance_m):
-    """
-    Scores a route based on circularity and low backtracking.
-    Distance filtering is handled separately before scoring.
-    Lower score = better route.
-    """
     if not route_coords or len(route_coords) < 2:
         return float("inf")
-
     start = route_coords[0]
     end = route_coords[-1]
     circularity = calculate_distance(start[0], start[1], end[0], end[1])
     circularity_score = circularity * 10
-
     backtrack_score = 0
     for i in range(2, len(route_coords)):
         p1 = route_coords[i - 2]
@@ -223,53 +257,30 @@ def score_route(route_coords, actual_distance, target_distance_m):
         dot = v1[0] * v2[0] + v1[1] * v2[1]
         if dot < -0.00001:
             backtrack_score += 1
-
     backtrack_score = backtrack_score / max(len(route_coords), 1)
     return circularity_score + backtrack_score
 
 
 def attach_leg_distances(sights, leg_distances, actual_distance_m, route_type):
-    """
-    Attaches real ORS leg distances to each sight.
-    Calculates cumulative distance and distance back to start.
-    """
     cumulative = 0.0
-
     for i, sight in enumerate(sights):
-        if i < len(leg_distances):
-            leg_km = round(leg_distances[i] / 1000, 2)
-        else:
-            leg_km = 0.0
+        leg_km = round(leg_distances[i] / 1000, 2) if i < len(leg_distances) else 0.0
         cumulative = round(cumulative + leg_km, 2)
         sight["distance_from_previous"] = leg_km
         sight["distance_cumulative"] = cumulative
-
     if route_type == "roundtrip" and len(leg_distances) > len(sights):
         back_km = round(leg_distances[len(sights)] / 1000, 2)
     else:
         back_km = 0.0
-
     if sights:
         sights[-1]["distance_back_to_start"] = back_km
         sights[-1]["total_km"] = round(actual_distance_m / 1000, 2)
-
     return sights
 
 
 def calculate_route(start_lat, start_lon, sights, max_distance_km, route_type="roundtrip"):
-    """
-    Generates a smooth loop route:
-    1. Tries 1-4 sights in both clockwise and counterclockwise order
-    2. Only considers routes within +/- 500m of target distance
-    3. From valid routes picks the one with best loop shape
-    4. If no route is within tolerance, picks the closest to target
-    Returns: route_coords, sights_on_route, distance_m, leg_distances
-    """
     url_base = "https://api.openrouteservice.org/v2/directions/foot-walking/geojson"
-    headers = {
-        "Authorization": ORS_API_KEY,
-        "Content-Type": "application/json"
-    }
+    headers = {"Authorization": ORS_API_KEY, "Content-Type": "application/json"}
 
     if route_type == "roundtrip":
         max_radius = max_distance_km / 2.0
@@ -316,9 +327,8 @@ def calculate_route(start_lat, start_lon, sights, max_distance_km, route_type="r
 
     target_m = max_distance_km * 1000
     tolerance_m = 500
-
-    valid_candidates = []   # within +/- 500m of target
-    all_candidates = []     # all attempts
+    valid_candidates = []
+    all_candidates = []
 
     for ordering_name, ordering in [("clockwise", clockwise), ("counterclockwise", counterclockwise)]:
         for n in range(min_sights, max_sights + 1):
@@ -331,36 +341,25 @@ def calculate_route(start_lat, start_lon, sights, max_distance_km, route_type="r
                 diff = abs(actual_distance - target_m)
                 score = score_route(route_coords_latlon, actual_distance, target_m)
                 print(f"{ordering_name} {n} sights: {actual_distance:.0f}m diff={diff:.0f}m score={score:.3f}")
-
-                candidate = {
-                    "data": data,
-                    "sights": waypoints,
-                    "coords": route_coords_latlon,
-                    "distance": actual_distance,
-                    "diff": diff,
-                    "score": score
-                }
+                candidate = {"data": data, "sights": waypoints, "coords": route_coords_latlon,
+                             "distance": actual_distance, "diff": diff, "score": score}
                 all_candidates.append(candidate)
                 if diff <= tolerance_m:
                     valid_candidates.append(candidate)
-
             except Exception as e:
                 print(f"Route error ({ordering_name}, {n} sights): {e}")
                 continue
 
-    # Pick best valid route (within tolerance, best loop shape)
-    # Fall back to closest to target if none within tolerance
     if valid_candidates:
         best = min(valid_candidates, key=lambda c: c["score"])
         print(f"✅ Valid route: {best['distance']:.0f}m (diff={best['diff']:.0f}m)")
     elif all_candidates:
         best = min(all_candidates, key=lambda c: c["diff"])
-        print(f"⚠️ No route within tolerance, using closest: {best['distance']:.0f}m")
+        print(f"⚠️ No route within tolerance, closest: {best['distance']:.0f}m")
     else:
         best = None
 
     if best is None:
-        print("⚠️ All route attempts failed, using fallback")
         fallback = [[start_lat, start_lon]]
         for sight in nearby_sights[:min_sights]:
             fallback.append([sight["lat"], sight["lon"]])
@@ -372,7 +371,6 @@ def calculate_route(start_lat, start_lon, sights, max_distance_km, route_type="r
         actual_distance = best["data"]["features"][0]["properties"]["summary"]["distance"]
         segments = best["data"]["features"][0]["properties"].get("segments", [])
         leg_distances = [seg["distance"] for seg in segments]
-        print(f"✅ Best route: {actual_distance:.0f}m")
         sights_on_route = [s for s in best["sights"] if is_on_route(s, best["coords"])]
         print(f"✅ Sights on route: {len(sights_on_route)}")
         return best["coords"], sights_on_route, actual_distance, leg_distances
@@ -387,12 +385,7 @@ def calculate_route(start_lat, start_lon, sights, max_distance_km, route_type="r
 
 
 def build_canonical_stops(start_lat, start_lon, start_name, sights, route_type):
-    """
-    Builds the single canonical ordered stop list used for:
-    map markers, route line, and Google Maps URL.
-    """
-    stops = []
-    stops.append({"name": start_name, "lat": start_lat, "lon": start_lon, "role": "start"})
+    stops = [{"name": start_name, "lat": start_lat, "lon": start_lon, "role": "start"}]
     for i, sight in enumerate(sights):
         stops.append({"name": sight["name"], "lat": sight["lat"], "lon": sight["lon"], "role": "sight", "index": i + 1})
     if route_type == "roundtrip":
@@ -405,7 +398,6 @@ def build_canonical_stops(start_lat, start_lon, start_name, sights, route_type):
 
 
 def build_google_maps_url(canonical_stops):
-    """Builds a Google Maps walking directions URL from the canonical stop list."""
     if len(canonical_stops) < 2:
         return ""
     origin = canonical_stops[0]
@@ -423,7 +415,6 @@ def build_google_maps_url(canonical_stops):
 
 
 def build_route_summary(canonical_stops, route_type):
-    """Builds a compact text summary of the ordered route stops."""
     if not canonical_stops:
         return "Generated Lisbon running route."
     start_name = canonical_stops[0]["name"]
@@ -436,12 +427,10 @@ def build_route_summary(canonical_stops, route_type):
 
 
 def create_map(canonical_stops, route_coords, route_type="roundtrip"):
-    """Creates an interactive folium map using the canonical stop list."""
     if not canonical_stops:
         return ""
     start = canonical_stops[0]
     m = folium.Map(location=[start["lat"], start["lon"]], zoom_start=14, tiles="CartoDB positron")
-
     sight_index = 1
     for stop in canonical_stops:
         if stop["role"] == "start":
@@ -455,10 +444,8 @@ def create_map(canonical_stops, route_coords, route_type="roundtrip"):
         elif stop["role"] == "finish" and route_type == "oneway":
             folium.Marker([stop["lat"], stop["lon"]], popup="🏁 Finish", tooltip="🏁 Finish",
                 icon=folium.Icon(color="blue", icon="flag", prefix="fa")).add_to(m)
-
     if route_coords:
         folium.PolyLine(route_coords, color="#E8106A", weight=4, opacity=0.8).add_to(m)
-
     return m._repr_html_()
 
 

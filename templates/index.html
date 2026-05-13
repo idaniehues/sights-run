@@ -488,9 +488,6 @@
 </section>
 
 <script>
-    const OPEN_RUNS_KEY = 'sightsRunOpenRuns';
-    const JOINED_RUNS_KEY = 'sightsRunJoinedOpenRuns';
-
     // Update metro station dropdown when distance changes
     const distanceSelect = document.querySelector('select[name="distance"]');
     distanceSelect.addEventListener('change', updateStations);
@@ -502,20 +499,10 @@
             const stations = await response.json();
             const select = document.querySelector('select[name="metro_station"]');
             const currentValue = select.value;
-
             select.innerHTML = stations.map(s => {
-                const emoji = s.line === 'blue' ? '🔵' :
-                              s.line === 'yellow' ? '🟡' :
-                              s.line === 'green' ? '🟢' :
-                              s.line === 'red' ? '🔴' : '';
+                const emoji = s.line === 'blue' ? '🔵' : s.line === 'yellow' ? '🟡' : s.line === 'green' ? '🟢' : s.line === 'red' ? '🔴' : '';
                 return `<option value="${s.name}" ${s.name === currentValue ? 'selected' : ''}>${emoji} ${s.name}</option>`;
             }).join('');
-
-            // If current selection no longer available, show note
-            const stillAvailable = stations.some(s => s.name === currentValue);
-            if (!stillAvailable && stations.length > 0) {
-                console.log(`Station ${currentValue} not available for this distance, switched to ${stations[0].name}`);
-            }
         } catch(e) {
             console.error('Could not update stations:', e);
         }
@@ -531,9 +518,7 @@
     radios.forEach(radio => {
         radio.addEventListener('change', () => {
             Object.values(fields).forEach(f => f.classList.remove('active'));
-            if (fields[radio.value]) {
-                fields[radio.value].classList.add('active');
-            }
+            if (fields[radio.value]) fields[radio.value].classList.add('active');
             if (radio.value === 'gps') {
                 navigator.geolocation.getCurrentPosition(pos => {
                     document.getElementById('gps_lat').value = pos.coords.latitude;
@@ -546,68 +531,48 @@
         });
     });
 
-    function getOpenRuns() {
-        try { return JSON.parse(localStorage.getItem(OPEN_RUNS_KEY)) || []; }
-        catch { return []; }
-    }
-
-    function saveOpenRuns(runs) {
-        localStorage.setItem(OPEN_RUNS_KEY, JSON.stringify(runs));
-    }
-
-    function getJoinedRunIds() {
-        try { return JSON.parse(localStorage.getItem(JOINED_RUNS_KEY)) || []; }
-        catch { return []; }
-    }
-
-    function saveJoinedRunIds(ids) {
-        localStorage.setItem(JOINED_RUNS_KEY, JSON.stringify([...new Set(ids)]));
-    }
-
-    function getUpcomingRuns() {
-        const now = new Date();
-        return getOpenRuns()
-            .filter(run => new Date(`${run.date}T${run.time}`) >= now)
-            .sort((a, b) => new Date(`${a.date}T${a.time}`) - new Date(`${b.date}T${b.time}`));
-    }
-
-    function renderCommunityRuns() {
+    async function renderCommunityRuns() {
         const container = document.getElementById('communityRunsList');
-        const runs = getUpcomingRuns();
+        try {
+            const response = await fetch('/api/open_runs');
+            const runs = await response.json();
+            const now = new Date();
+            const upcoming = runs.filter(r => new Date(`${r.date}T${r.time}`) >= now);
 
-        if (!runs.length) {
-            container.innerHTML = '<div class="community-empty">No upcoming community runs yet. Generate a route, then create an Open Run to publish one here.</div>';
-            return;
+            if (!upcoming.length) {
+                container.innerHTML = '<div class="community-empty">No upcoming community runs yet. Generate a route, then create an Open Run to publish one here.</div>';
+                return;
+            }
+
+            container.innerHTML = upcoming.map(run => {
+                const participants = run.participants || [];
+                const maxText = run.max_participants ? ` / ${run.max_participants}` : '';
+                const isFull = run.max_participants && participants.length >= run.max_participants;
+                const viewLink = run.gmaps_url || '#';
+
+                return `
+                    <div class="community-card">
+                        <h3>${escapeHtml(run.title)}</h3>
+                        <div class="community-meta">${escapeHtml(formatRunDateTime(run.date, run.time))}</div>
+                        <div class="community-meta">📏 ${run.distance} km</div>
+                        <div class="community-meta">📍 ${escapeHtml(run.start_name || run.meeting_point || '')}</div>
+                        <div class="community-count">${participants.length}${maxText} joined</div>
+                        <div class="community-participants">${escapeHtml(participants.join(', ') || 'No runners yet')}</div>
+                        <div class="community-actions">
+                            <a href="${escapeHtml(viewLink)}" target="_blank" rel="noopener noreferrer">View Route</a>
+                            <button onclick="toggleCommunityJoin('${escapeJs(run.id)}')" ${isFull ? 'disabled' : ''}>${isFull ? 'Full' : 'Join Run'}</button>
+                        </div>
+                        <div class="community-join-row" id="community-join-row-${escapeHtml(run.id)}">
+                            <input type="text" placeholder="Your name" id="community-join-${escapeHtml(run.id)}">
+                            <button onclick="joinCommunityRun('${escapeJs(run.id)}')">Join</button>
+                        </div>
+                        <div class="community-message" id="community-message-${escapeHtml(run.id)}"></div>
+                    </div>
+                `;
+            }).join('');
+        } catch(e) {
+            container.innerHTML = '<div class="community-empty">Could not load community runs.</div>';
         }
-
-        container.innerHTML = runs.map(run => {
-            const participants = run.participants || [];
-            const maxText = run.maxParticipants ? ` / ${run.maxParticipants}` : '';
-            const participantNames = participants.length ? participants.join(', ') : 'No runners yet';
-            const isFull = run.maxParticipants && participants.length >= run.maxParticipants;
-            const route = run.route || {};
-            const viewLink = route.googleMapsUrl || '#';
-
-            return `
-                <div class="community-card" data-run-id="${escapeHtml(run.id)}">
-                    <h3>${escapeHtml(run.title)}</h3>
-                    <div class="community-meta">${escapeHtml(formatRunDateTime(run.date, run.time))}</div>
-                    <div class="community-meta">📏 ${escapeHtml(String(route.distance || ''))} km</div>
-                    <div class="community-meta">📍 ${escapeHtml(route.startName || run.meetingPoint || '')}</div>
-                    <div class="community-count">${participants.length}${maxText} joined</div>
-                    <div class="community-participants">${escapeHtml(participantNames)}</div>
-                    <div class="community-actions">
-                        <a href="${escapeHtml(viewLink)}" target="_blank" rel="noopener noreferrer">View Route</a>
-                        <button onclick="toggleCommunityJoin('${escapeJs(run.id)}')" ${isFull ? 'disabled' : ''}>${isFull ? 'Full' : 'Join Run'}</button>
-                    </div>
-                    <div class="community-join-row" id="community-join-row-${escapeHtml(run.id)}">
-                        <input type="text" placeholder="Your name" id="community-join-${escapeHtml(run.id)}">
-                        <button onclick="joinCommunityRun('${escapeJs(run.id)}')">Join</button>
-                    </div>
-                    <div class="community-message" id="community-message-${escapeHtml(run.id)}"></div>
-                </div>
-            `;
-        }).join('');
     }
 
     function toggleCommunityJoin(runId) {
@@ -615,29 +580,24 @@
         if (row) row.classList.toggle('active');
     }
 
-    function joinCommunityRun(runId) {
+    async function joinCommunityRun(runId) {
         const input = document.getElementById(`community-join-${runId}`);
         const message = document.getElementById(`community-message-${runId}`);
-        const name = input.value.trim().replace(/\s+/g, ' ');
-
+        const name = input.value.trim();
         if (!name) { message.textContent = 'Add your name to join.'; return; }
 
-        const runs = getOpenRuns();
-        const run = runs.find(item => item.id === runId);
-        if (!run) { message.textContent = 'This run is no longer available.'; return; }
-
-        run.participants = run.participants || [];
-        if (run.participants.some(p => p.toLowerCase() === name.toLowerCase())) {
-            message.textContent = `${name} is already on the list.`; return;
+        try {
+            const response = await fetch(`/api/open_runs/${runId}/join`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name })
+            });
+            const data = await response.json();
+            if (!response.ok) { message.textContent = data.error || 'Could not join.'; return; }
+            await renderCommunityRuns();
+        } catch(e) {
+            message.textContent = 'Something went wrong.';
         }
-        if (run.maxParticipants && run.participants.length >= run.maxParticipants) {
-            message.textContent = 'This run is full.'; return;
-        }
-
-        run.participants.push(name);
-        saveOpenRuns(runs);
-        saveJoinedRunIds([...getJoinedRunIds(), runId]);
-        renderCommunityRuns();
     }
 
     function formatRunDateTime(date, time) {
@@ -654,7 +614,7 @@
     }
 
     function escapeJs(value) {
-        return String(value || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+        return String(value || '').replace(/\/g, '\\').replace(/'/g, "\'");
     }
 
     renderCommunityRuns();
