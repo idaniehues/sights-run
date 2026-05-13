@@ -283,7 +283,12 @@ def calculate_route(start_lat, start_lon, sights, max_distance_km, route_type="r
     headers = {"Authorization": ORS_API_KEY, "Content-Type": "application/json"}
 
     if route_type == "roundtrip":
-        max_radius = max_distance_km / 2.0
+        if max_distance_km >= 12:
+            max_radius = max_distance_km / 1.5   # 8km radius for 12km loop
+        elif max_distance_km >= 8:
+            max_radius = max_distance_km / 1.8   # ~4.4km radius for 8km loop
+        else:
+            max_radius = max_distance_km / 2.0   # standard for 3km and 5km
     else:
         max_radius = max_distance_km * 0.9
 
